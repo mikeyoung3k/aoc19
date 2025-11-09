@@ -1,6 +1,8 @@
 mod day1;
 mod day2;
 
+mod intcomp;
+
 const BASE_DIR: &'static str = "C://Users/Mike_/Documents/Rust/advent_of_code/aoc2019/data";
 
 fn main() {
