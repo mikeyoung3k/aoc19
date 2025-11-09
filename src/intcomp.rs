@@ -1,3 +1,9 @@
+pub fn parse_str(prog_str: &str) -> Vec<isize> {
+    prog_str.split(',')
+    .map(|s| s.parse().expect("Failed to parse instruction"))
+    .collect()
+}
+
 pub fn run_program(prog: &mut Vec<isize>) -> isize {
     let mut instr_ptr = 0;
     let mut acc = Action::Continue;
@@ -42,11 +48,6 @@ enum Action {
     PrematureEnd
 }
 
-pub fn parse_str(prog_str: &str) -> Vec<isize> {
-    prog_str.split(',')
-    .map(|s| s.parse().expect("Failed to parse instruction"))
-    .collect()
-}
 
 #[cfg(test)]
 mod test {
