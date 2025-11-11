@@ -109,7 +109,7 @@ mod test {
     fn test_create_set() {
         let expect = HashSet::from(TEST_COORDS);
         let map = create_map(TEST_HASH_INPUT);
-        let mut coords = create_set(&map);
+        let coords = create_set(&map);
 
         for coord in expect {
             assert!(coords.contains(&coord))
