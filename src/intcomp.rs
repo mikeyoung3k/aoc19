@@ -53,7 +53,6 @@ enum Action {
 mod test {
     use super::*;
     const TEST_STR: & str = "1,9,10,3,2,3,11,0,99,30,40,50";
-    const TEST_OUT: isize = 3500;
 
 
     #[test]

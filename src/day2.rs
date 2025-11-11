@@ -19,7 +19,7 @@ fn pt1(prog_str: &str) -> isize {
 }
 
 fn pt2(prog_str: &str) -> isize {
-    let mut prog_vec = intcomp::parse_str(prog_str);
+    let prog_vec = intcomp::parse_str(prog_str);
         for noun in 0..=99 {
             for verb in 0..=99 {
                 let mut prog_copy = prog_vec.clone();
