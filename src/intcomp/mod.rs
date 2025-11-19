@@ -6,6 +6,8 @@
 // Run Instruction and execute effect 
 // Move pointer based on len from beginning
 
+use std::fmt::Error;
+
 
 enum Instruction {
     Add(Vec<isize>),
@@ -16,55 +18,30 @@ enum Instruction {
 }
 
 struct IntComp {
-    memory: Vec<&str>, // vec!["01002","3","4","5"]
+    memory: Vec<String>, // vec!["01002","3","4","5"]
     instr_pntr: usize,
 }
 
 impl IntComp {
-    fn parse_instruction(&self,instruction: &[isize]) -> Instruction {
-        // Instruction format:
-        // ABCDE
-        // A, B, C: Parameter modes for parameters 3, 2, and 1 respectively
-        // DE: OpCode
-        let opcode = instruction[0] % 100;
-        // let a_mode = (instruction[0] / 100) % 10;
-        // let b_mode = (instruction[0] / 1000) % 10;
-        // let c_mode = (instruction[0] / 10000) % 10;
-        // let a = if a_mode == 0 {
-        //     self.memory[instruction[1] as usize]
-        // } else {
-        //     instruction[1]
-        // };
-        // let b = if b_mode == 0 {
-        //     self.memory[instruction[2] as usize]
-        // } else {
-        //     instruction[2]
-        // };
-        // let c = if c_mode == 0 {
-        //     self.memory[instruction[3] as usize]
-        // } else {
-        //     instruction[3]
-        // };
-        match opcode {
-            1 => {
-                let a = if a_mode == 0 {
-                    self.memory[instruction[1] as usize]
-                } else {
-                    instruction[1]
-                };
-                let b = if b_mode == 0 {
-                    self.memory[instruction[2] as usize]
-                } else {
-                    instruction[2]
-                };
-                let c = if c_mode == 0 {
-                    self.memory[instruction[3] as usize]
-                } else {
-                    instruction[3]
-                };
-                Instruction::Add(vec![a, b, c])
-            }
+    fn load_mem(&self, addr: usize) -> Result<&str,String> {
+        self.memory.get(addr).map(|s| s.as_str()).ok_or("Invalid load memory address".to_owned())
+    }
+
+    fn store_mem(&mut self, addr: usize, value: String) -> Result<(), String> {
+        if self.memory.len() >= addr {
+            return Err("Invalid store memory address".to_string())
         }
+        self.memory[addr] = value;
+        Ok(())
+    }
+
+    fn parse_instruction(&self) -> Result<Instruction, String> {
+        todo!();
+        // Load memory at instruction pointer
+        // Check num chars -> Value to move instruction pointer by
+        // Check parameter modes and get values
+        // Create Instruction with parameter values
+        // Return
     }
 
 
@@ -84,15 +61,5 @@ impl IntComp {
 mod test {
     use super::*;
 
-    #[test]
-    fn test_parse_instruction() {
-        let instr = vec![1002,4,3,4];
-        let memory = vec![1, 2, 3, 4];
-        let expect = Some(12);
-
-        let comp = IntComp{memory: memory, instr_pntr: 0};
-        let result = comp.parse_instruction(&instr);
-
-        assert_eq!(expect,result.run());
-    }
+    
 }
