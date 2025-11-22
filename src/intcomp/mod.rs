@@ -1,11 +1,3 @@
-// Store memory as Vec<&str>
-// Look at where instr pntr goes and get the opcode block
-// Assess len (assign) and split into param modes and opcode
-// Return - and get the values of the parameters
-// Based on op code, create Instruction type with parameters
-// Run Instruction and execute effect 
-// Move pointer based on len from beginning
-
 use std::error::Error;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -14,7 +6,7 @@ enum Instruction {
     Multiply(Parameters),
     Store(Parameters),
     Load(usize),
-    Terminate {},
+    Terminate,
 }
 
 
@@ -24,12 +16,27 @@ struct Parameters {
     store_location: usize,
 }
 
+#[derive(Debug, PartialEq, Eq)]
 struct IntComp {
     memory: Vec<String>, // vec!["01002","3","4","5"]
     instr_pntr: usize,
+    output_store: Vec<isize>,
 }
 
 impl IntComp {
+    fn from_string(s: String) -> IntComp {
+        let memory = s.split(",").map(|s| s.to_string()).collect();
+        IntComp {
+            memory,
+            instr_pntr: 0,
+            output_store: Vec::new(),
+        }
+    }
+    fn run_program(&mut self) {
+        while !self.run_instruction(){
+
+        };
+    }
     fn load_mem(&self, addr: usize) -> Result<&str,String> {
         self.memory.get(addr).map(|s| s.as_str()).ok_or("Invalid load memory address".to_owned())
     }
@@ -77,21 +84,32 @@ impl IntComp {
                 Ok(Instruction::Store(Parameters { inputs: vec![param_a], store_location: param_b as usize }))
             }, // Store
             4 => {
-                let param_a = self.parse_param(a_mode)?;
+                let param_a = self.parse_param(1)?;
                 Ok(Instruction::Load(param_a as usize))
             }, // Load
-            99 => Ok(Instruction::Terminate {}), // Terminate
+            99 => Ok(Instruction::Terminate), // Terminate
             _ => Err("Invalid opcode".to_string())?,
         }
     }
 
-    fn run_instruction(&mut self) {
-        todo!();
-        // Loads parameter values manually
-        // Call run for the instruction
-        // Store value manually
-        // This fn must keep track of output location
-        // This fn must parse parameter types and get final values
+    fn run_instruction(&mut self) -> bool {
+        let next = self.parse_next_instruction().expect("Failed to parse next instruction");
+        match next {
+            Instruction::Add(params) => {
+                self.store_mem(params.store_location, params.inputs.iter().sum::<isize>().to_string()).expect("Failed to store add");
+            },
+            Instruction::Multiply(Parameters{inputs,store_location}) => {
+                self.store_mem(store_location, inputs.iter().fold(1,|acc,x| acc * x).to_string()).expect("Failed to store multiply");
+            },
+            Instruction::Store(params) => {
+                self.store_mem(params.store_location, params.inputs[0].to_string()).expect("Failed to store value");
+            },
+            Instruction::Load(loc) => {
+                self.output_store.push(self.load_mem(loc).expect("Failed to load value").parse::<isize>().expect("Failed to parse memory as isize"));
+            },
+            Instruction::Terminate => {return true},
+        }
+        false
     }
 
     fn parse_param(&mut self, mode: usize) -> Result<isize, Box<dyn Error>> {
@@ -104,15 +122,28 @@ impl IntComp {
         self.instr_pntr += 1;
         Ok(r)
     }
-
+    
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
+    
+    fn new_testcomp() -> IntComp {
+        let test_mem = vec!["1002", "4","3","4","33"].iter().map(|s| s.to_string()).collect();
+        IntComp { memory: test_mem, instr_pntr: 0, output_store:vec![] }
+    }
 
     #[test]
-    fn test_instruction_parsing() {
+    fn test_new_intcomp() {
+        let test_string = "1002,4,3,4,33".to_string();
+        let intcomp = IntComp::from_string(test_string);
+        let expect = new_testcomp();
+        assert_eq!(intcomp, expect);
+    }
+
+    #[test]
+    fn test_instruction_parsing_mult() {
         let mut intcomp = new_testcomp();
         assert_eq!(intcomp.instr_pntr,0);
         let next_instr = intcomp.parse_next_instruction();
@@ -122,10 +153,99 @@ mod test {
         let expect_instr = Instruction::Multiply(expect_params);
         assert_eq!(next_instr.unwrap(), expect_instr);
     }
+
+    #[test]
+    fn test_instruction_parsing_add() {
+        let mut intcomp = new_testcomp();
+        intcomp.memory[0] = "1001".to_string();
+        assert_eq!(intcomp.instr_pntr,0);
+        let next_instr = intcomp.parse_next_instruction();
+        assert!(next_instr.is_ok());
+        assert_eq!(intcomp.instr_pntr,4);
+        let expect_params = Parameters { inputs: vec![33, 3], store_location: 4 };
+        let expect_instr = Instruction::Add(expect_params);
+        assert_eq!(next_instr.unwrap(), expect_instr);
+    }
     
-    fn new_testcomp() -> IntComp {
-        let test_mem = vec!["1002", "4","3","4","33"].iter().map(|s| s.to_string()).collect();
-        IntComp { memory: test_mem, instr_pntr: 0 }
+    #[test]
+    fn test_instruction_parsing_store() {
+        let mut intcomp = new_testcomp();
+        intcomp.memory[0] = "1003".to_string();
+        assert_eq!(intcomp.instr_pntr,0);
+        let next_instr = intcomp.parse_next_instruction();
+        assert!(next_instr.is_ok());
+        assert_eq!(intcomp.instr_pntr,3);
+        let expect_params = Parameters { inputs: vec![33], store_location: 3 };
+        let expect_instr = Instruction::Store(expect_params);
+        assert_eq!(next_instr.unwrap(), expect_instr);
+    }
+    
+    #[test]
+    fn test_instruction_parsing_load() {
+        let mut intcomp = new_testcomp();
+        intcomp.memory[0] = "1004".to_string();
+        assert_eq!(intcomp.instr_pntr,0);
+        let next_instr = intcomp.parse_next_instruction();
+        assert!(next_instr.is_ok());
+        assert_eq!(intcomp.instr_pntr,2);
+        let expect_params = 4;
+        let expect_instr = Instruction::Load(expect_params);
+        assert_eq!(next_instr.unwrap(), expect_instr);
+    }
+    
+    #[test]
+    fn test_instruction_parsing_terminate() {
+        let mut intcomp = new_testcomp();
+        intcomp.memory[0] = "1099".to_string();
+        assert_eq!(intcomp.instr_pntr,0);
+        let next_instr = intcomp.parse_next_instruction();
+        assert!(next_instr.is_ok());
+        assert_eq!(intcomp.instr_pntr,1);
+        let expect_instr = Instruction::Terminate;
+        assert_eq!(next_instr.unwrap(), expect_instr);
+    }
+
+    #[test]
+    fn test_run_add() {
+        let mut intcomp = new_testcomp();
+        intcomp.memory[0] = "1001".to_string();
+        assert_eq!(intcomp.memory[4],"33".to_string());
+        let out = intcomp.run_instruction();
+        assert_eq!(intcomp.memory[4],"36".to_string());
+        assert!(!out);
+    }
+
+    #[test]
+    fn test_run_mult() {
+        let mut intcomp = new_testcomp();
+        assert_eq!(intcomp.memory[4],"33".to_string());
+        let out = intcomp.run_instruction();
+        assert_eq!(intcomp.memory[4],"99".to_string());
+        assert!(!out);
+    }
+
+    #[test]
+    fn test_run_store() {
+        let mut intcomp = new_testcomp();
+        intcomp.memory[0] = "1003".to_string();
+        assert_eq!(intcomp.memory[3],"4".to_string());
+        assert!(!intcomp.run_instruction());
+        assert_eq!(intcomp.memory[3],"33".to_string());
+    }
+
+    #[test]
+    fn test_run_load() {
+        let mut intcomp = new_testcomp();
+        intcomp.memory[0] = "1004".to_string();
+        assert!(!intcomp.run_instruction());
+        assert!(intcomp.output_store[0] == 33);
+    }
+    
+    #[test]
+    fn test_run_terminate() {
+        let mut intcomp = new_testcomp();
+        intcomp.memory[0] = "1099".to_string();
+        assert!(intcomp.run_instruction());
     }
 
     #[test]
