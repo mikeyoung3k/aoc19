@@ -1,4 +1,5 @@
 use std::error::Error;
+use std::io;
 
 #[derive(Debug, PartialEq, Eq)]
 enum Instruction {
@@ -6,6 +7,10 @@ enum Instruction {
     Multiply(Parameters),
     Store(Parameters),
     Load(usize),
+    Jump(usize),
+    LT(Parameters),
+    EQ(Parameters),
+    Pass,
     Terminate,
 }
 
@@ -17,14 +22,14 @@ struct Parameters {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-struct IntComp {
-    memory: Vec<String>, // vec!["01002","3","4","5"]
+pub struct IntComp  {
+    memory: Vec<String>,
     instr_pntr: usize,
-    output_store: Vec<isize>,
+    pub output_store: Vec<isize>,
 }
 
 impl IntComp {
-    fn from_string(s: String) -> IntComp {
+    pub fn from_string(s: String) -> IntComp {
         let memory = s.split(",").map(|s| s.to_string()).collect();
         IntComp {
             memory,
@@ -32,11 +37,12 @@ impl IntComp {
             output_store: Vec::new(),
         }
     }
-    fn run_program(&mut self) {
-        while !self.run_instruction(){
 
+    pub fn run_program(&mut self) {
+        while !self.run_instruction(){
         };
     }
+
     fn load_mem(&self, addr: usize) -> Result<&str,String> {
         self.memory.get(addr).map(|s| s.as_str()).ok_or("Invalid load memory address".to_owned())
     }
@@ -50,11 +56,6 @@ impl IntComp {
     }
 
     fn parse_next_instruction(&mut self) -> Result<Instruction, Box<dyn Error>> {
-        // Load memory at instruction pointer
-        // Check num chars -> Value to move instruction pointer by
-        // Check parameter modes and get values
-        // Create Instruction with parameter values
-        // Return
         let instr = self.load_mem(self.instr_pntr)?.parse::<usize>().expect("Failed to parse instruction");
         self.instr_pntr += 1;
 
@@ -62,8 +63,7 @@ impl IntComp {
         let opcode = instr % 100;
         let a_mode = (instr/100) % 10;
         let b_mode = (instr/1000) % 10;
-        let c_mode = (instr/10000) % 10;
-        // 01002,9,10,3
+        //let c_mode = (instr/10000) % 10;
 
         match opcode {
             1 => {
@@ -79,14 +79,43 @@ impl IntComp {
                 Ok(Instruction::Multiply(Parameters { inputs: vec![param_a, param_b], store_location: param_c as usize }))
             },
             3 => {
-                let param_a = self.parse_param(a_mode)?;
-                let param_b = self.parse_param(1)?;
-                Ok(Instruction::Store(Parameters { inputs: vec![param_a], store_location: param_b as usize }))
+                let param_a = self.parse_param(1)?;
+                Ok(Instruction::Store(Parameters { inputs: vec![], store_location: param_a as usize }))
             }, // Store
             4 => {
                 let param_a = self.parse_param(1)?;
                 Ok(Instruction::Load(param_a as usize))
             }, // Load
+            5 => { // Jump if true
+                let param_a = self.parse_param(a_mode)?;
+                let param_b = self.parse_param(b_mode)?;
+                if param_a != 0 {
+                    Ok(Instruction::Jump(param_b as usize))
+                } else {
+                    Ok(Instruction::Pass)
+                }
+            },
+            6 => { // Jump if false
+                let param_a = self.parse_param(a_mode)?;
+                let param_b = self.parse_param(b_mode)?;
+                if param_a == 0 {
+                    Ok(Instruction::Jump(param_b as usize))
+                } else {
+                    Ok(Instruction::Pass)
+                }
+            },
+            7 => { // Less than
+                let param_a = self.parse_param(a_mode)?;
+                let param_b = self.parse_param(b_mode)?;
+                let param_c = self.parse_param(1)?;
+                Ok(Instruction::LT(Parameters { inputs: vec![param_a, param_b], store_location: param_c as usize }))
+            },
+            8 => { // Equals
+                let param_a = self.parse_param(a_mode)?;
+                let param_b = self.parse_param(b_mode)?;
+                let param_c = self.parse_param(1)?;
+                Ok(Instruction::EQ(Parameters { inputs: vec![param_a, param_b], store_location: param_c as usize }))
+            },
             99 => Ok(Instruction::Terminate), // Terminate
             _ => Err("Invalid opcode".to_string())?,
         }
@@ -102,11 +131,29 @@ impl IntComp {
                 self.store_mem(store_location, inputs.iter().fold(1,|acc,x| acc * x).to_string()).expect("Failed to store multiply");
             },
             Instruction::Store(params) => {
-                self.store_mem(params.store_location, params.inputs[0].to_string()).expect("Failed to store value");
+                let input = get_user_input().expect("Failed to get user input");
+                self.store_mem(params.store_location, input).expect("Failed to store value");
             },
             Instruction::Load(loc) => {
                 self.output_store.push(self.load_mem(loc).expect("Failed to load value").parse::<isize>().expect("Failed to parse memory as isize"));
             },
+            Instruction::Jump(loc) => {self.instr_pntr = loc },
+            Instruction::LT(params) => {
+                if params.inputs[0] < params.inputs[1] {
+                    self.store_mem(params.store_location, "1".to_string()).expect("Failed to store less than")
+                } else {
+                    self.store_mem(params.store_location, "0".to_string()).expect("Failed to store not less than")
+                }
+            },
+            Instruction::EQ(params) => {
+                if params.inputs[0] == params.inputs[1] {
+                    self.store_mem(params.store_location, "1".to_string()).expect("Failed to store less than")
+                } else {
+                    self.store_mem(params.store_location, "0".to_string()).expect("Failed to store not less than")
+                }
+                
+            }
+            Instruction::Pass => {}, // Pass through
             Instruction::Terminate => {return true},
         }
         false
@@ -123,6 +170,13 @@ impl IntComp {
         Ok(r)
     }
     
+}
+
+fn get_user_input() -> Result<String, Box<dyn Error>> {
+    println!("Enter your input:");
+    let mut input = String::new();
+    io::stdin().read_line(&mut input)?;
+    Ok(input.trim().to_string())
 }
 
 #[cfg(test)]
@@ -174,8 +228,8 @@ mod test {
         assert_eq!(intcomp.instr_pntr,0);
         let next_instr = intcomp.parse_next_instruction();
         assert!(next_instr.is_ok());
-        assert_eq!(intcomp.instr_pntr,3);
-        let expect_params = Parameters { inputs: vec![33], store_location: 3 };
+        assert_eq!(intcomp.instr_pntr,2);
+        let expect_params = Parameters { inputs: vec![], store_location: 4 };
         let expect_instr = Instruction::Store(expect_params);
         assert_eq!(next_instr.unwrap(), expect_instr);
     }
@@ -224,14 +278,14 @@ mod test {
         assert!(!out);
     }
 
-    #[test]
-    fn test_run_store() {
-        let mut intcomp = new_testcomp();
-        intcomp.memory[0] = "1003".to_string();
-        assert_eq!(intcomp.memory[3],"4".to_string());
-        assert!(!intcomp.run_instruction());
-        assert_eq!(intcomp.memory[3],"33".to_string());
-    }
+    // #[test]
+    // fn test_run_store() {
+    //     let mut intcomp = new_testcomp();
+    //     intcomp.memory[0] = "1003".to_string();
+    //     assert_eq!(intcomp.memory[3],"4".to_string());
+    //     assert!(!intcomp.run_instruction());
+    //     assert_eq!(intcomp.memory[3],"4".to_string());
+    // }
 
     #[test]
     fn test_run_load() {
