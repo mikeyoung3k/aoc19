@@ -3,6 +3,7 @@ mod day2;
 mod day3;
 mod day4;
 mod day5;
+mod day6;
 
 mod intcomp;
 
@@ -19,4 +20,6 @@ fn main() {
     // println!("Day 4 part 1: {}, Day 4 part 2: {}", r1, r2);
     // let (r1,r2) = day5::run();
     // println!("Day 5 part 1: {}, Day 5 part 2: {}", r1, r2);
+    let (r1,r2) = day6::run();
+    println!("Day 6 part 1: {}, Day 6 part 2: {}", r1, r2);
 }
