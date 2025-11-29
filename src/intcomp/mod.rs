@@ -1,5 +1,5 @@
 use std::error::Error;
-use std::io;
+use std::{cmp,io,fmt};
 
 #[derive(Debug, PartialEq, Eq)]
 enum Instruction {
@@ -15,26 +15,43 @@ enum Instruction {
 }
 
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq,Eq)]
 struct Parameters {
     inputs: Vec<isize>,
     store_location: usize,
 }
 
-#[derive(Debug, PartialEq, Eq)]
 pub struct IntComp  {
     memory: Vec<String>,
     instr_pntr: usize,
     pub output_store: Vec<isize>,
+    input: Box<dyn FnMut() -> String>,
+}
+
+impl fmt::Debug for IntComp {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result{
+        fmt.debug_struct("IntComp")
+        .field("memory", &self.memory)
+        .field("instr_pntr", &self.instr_pntr)
+        .field("output_store", &self.output_store)
+        .finish()
+    }
+}
+
+impl cmp::PartialEq for IntComp {
+    fn eq(&self, other: &Self) -> bool {
+        self.memory == other.memory && self.instr_pntr == other.instr_pntr && self.output_store == other.output_store
+    }
 }
 
 impl IntComp {
-    pub fn from_string(s: String) -> IntComp {
+    pub fn from_string(s: String, input: Box<dyn FnMut() -> String>) -> IntComp {
         let memory = s.split(",").map(|s| s.to_string()).collect();
         IntComp {
             memory,
             instr_pntr: 0,
             output_store: Vec::new(),
+            input,
         }
     }
 
@@ -131,7 +148,7 @@ impl IntComp {
                 self.store_mem(store_location, inputs.iter().fold(1,|acc,x| acc * x).to_string()).expect("Failed to store multiply");
             },
             Instruction::Store(params) => {
-                let input = get_user_input().expect("Failed to get user input");
+                let input = (self.input)();
                 self.store_mem(params.store_location, input).expect("Failed to store value");
             },
             Instruction::Load(loc) => {
@@ -172,11 +189,11 @@ impl IntComp {
     
 }
 
-fn get_user_input() -> Result<String, Box<dyn Error>> {
+pub fn get_user_input() -> String {
     println!("Enter your input:");
     let mut input = String::new();
-    io::stdin().read_line(&mut input)?;
-    Ok(input.trim().to_string())
+    io::stdin().read_line(&mut input).unwrap();
+    input.trim().to_string()
 }
 
 #[cfg(test)]
@@ -185,13 +202,13 @@ mod test {
     
     fn new_testcomp() -> IntComp {
         let test_mem = vec!["1002", "4","3","4","33"].iter().map(|s| s.to_string()).collect();
-        IntComp { memory: test_mem, instr_pntr: 0, output_store:vec![] }
+        IntComp { memory: test_mem, instr_pntr: 0, output_store:vec![], input: Box::new(|| "".to_string()) }
     }
 
     #[test]
     fn test_new_intcomp() {
         let test_string = "1002,4,3,4,33".to_string();
-        let intcomp = IntComp::from_string(test_string);
+        let intcomp = IntComp::from_string(test_string, Box::new(|| "".to_string()));
         let expect = new_testcomp();
         assert_eq!(intcomp, expect);
     }
@@ -278,14 +295,15 @@ mod test {
         assert!(!out);
     }
 
-    // #[test]
-    // fn test_run_store() {
-    //     let mut intcomp = new_testcomp();
-    //     intcomp.memory[0] = "1003".to_string();
-    //     assert_eq!(intcomp.memory[3],"4".to_string());
-    //     assert!(!intcomp.run_instruction());
-    //     assert_eq!(intcomp.memory[3],"4".to_string());
-    // }
+    #[test]
+    fn test_run_store() {
+        let mut intcomp = new_testcomp();
+        intcomp.input = Box::new(|| "0".to_string());
+        intcomp.memory[0] = "1003".to_string();
+        assert_eq!(intcomp.memory[4],"33".to_string());
+        assert!(!intcomp.run_instruction());
+        assert_eq!(intcomp.memory[4],"0".to_string());
+    }
 
     #[test]
     fn test_run_load() {
