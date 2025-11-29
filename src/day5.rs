@@ -11,7 +11,7 @@ fn pt1() -> isize {
     let mut intcomp = IntComp::from_string(program_str, Box::new(get_user_input));
     intcomp.run_program();
     println!("{:?}", intcomp.output_store);
-    intcomp.output_store[intcomp.output_store.len() - 1]
+    intcomp.output_store[intcomp.output_store.len() - 1].parse::<isize>().unwrap()
 }
 
 fn pt2() -> isize {
@@ -20,5 +20,5 @@ fn pt2() -> isize {
     let mut intcomp = IntComp::from_string(program_str,Box::new(get_user_input));
     intcomp.run_program();
     println!("{:?}", intcomp.output_store);
-    intcomp.output_store[intcomp.output_store.len() - 1]
+    intcomp.output_store[intcomp.output_store.len() - 1].parse::<isize>().unwrap()
 }

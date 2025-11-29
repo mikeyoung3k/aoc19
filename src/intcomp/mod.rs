@@ -24,7 +24,7 @@ struct Parameters {
 pub struct IntComp  {
     memory: Vec<String>,
     instr_pntr: usize,
-    pub output_store: Vec<isize>,
+    pub output_store: Vec<String>,
     input: Box<dyn FnMut() -> String>,
 }
 
@@ -152,7 +152,7 @@ impl IntComp {
                 self.store_mem(params.store_location, input).expect("Failed to store value");
             },
             Instruction::Load(loc) => {
-                self.output_store.push(self.load_mem(loc).expect("Failed to load value").parse::<isize>().expect("Failed to parse memory as isize"));
+                self.output_store.push(self.load_mem(loc).expect("Failed to load value").to_owned());
             },
             Instruction::Jump(loc) => {self.instr_pntr = loc },
             Instruction::LT(params) => {
@@ -310,7 +310,7 @@ mod test {
         let mut intcomp = new_testcomp();
         intcomp.memory[0] = "1004".to_string();
         assert!(!intcomp.run_instruction());
-        assert!(intcomp.output_store[0] == 33);
+        assert!(intcomp.output_store[0] == "33".to_string());
     }
     
     #[test]
