@@ -3,6 +3,7 @@ use crate::intcomp::IntComp;
 use std::fs::read_to_string;
 use std::path::Path;
 use crate::BASE_DIR;
+use std::sync::mpsc;
 
 pub fn run() -> (isize, isize) {
     let path = Path::new(BASE_DIR).join("real").join("day7.txt");
@@ -18,9 +19,12 @@ fn pt1(data: &String) -> isize {
         let mut output = "0".to_string();
         for _ in 1..=5 {
             let mut inputs = vec![output, combo.pop().unwrap()]; // [0, phase_setting]
-            let mut amp = IntComp::from_string(data.to_owned(), Box::new(move || inputs.pop().unwrap()));
+            let (tx,rx) = mpsc::channel();
+            let mut amp = IntComp::from_string(data.to_owned(),tx, Box::new(move || inputs.pop().unwrap()));
             amp.run_program();
-            output = amp.output_store[amp.output_store.len() - 1].clone();
+            drop(amp);
+            let output_store = rx.iter().collect::<Vec<String>>();
+            output = output_store.last().unwrap().to_owned();
         }
         if output.parse::<isize>().unwrap() > max_output {
             max_output = output.parse::<isize>().unwrap();
