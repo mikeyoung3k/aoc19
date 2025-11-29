@@ -4,11 +4,12 @@ use std::fs::read_to_string;
 use std::path::Path;
 use crate::BASE_DIR;
 use std::sync::mpsc;
+use std::thread;
 
 pub fn run() -> (isize, isize) {
     let path = Path::new(BASE_DIR).join("real").join("day7.txt");
     let input_string = read_to_string(path).expect("Error reading file");
-    (pt1(&input_string),0)
+    (pt1(&input_string),pt2(&input_string))
 }
 
 fn pt1(data: &String) -> isize {
@@ -34,7 +35,62 @@ fn pt1(data: &String) -> isize {
 }
 
 fn pt2(data: &String) -> isize {
-    0
+    let mut max_output = isize::MIN;
+    for mut combo in (5..=9).map(|x| x.to_string()).permutations(5) {
+        // Create Amplifier 1, with first input of phase setting, second input of 0
+        // Create in turn, Amplifiers 2-5 with first input of phase setting and second input of previous amp out
+        let output = single_iteration(data, combo);
+        if output.parse::<isize>().unwrap() > max_output {
+            max_output = output.parse::<isize>().unwrap();
+        }
+    }
+    max_output
+}
+
+fn single_iteration(data: &String, mut phase_settings: Vec<String>) -> String {
+    let (tx0,mut rx0) = mpsc::channel::<String>();
+    // tx0 is the output of the last amp
+    // rx0 is the input of the first amp
+    let phase = phase_settings.pop().unwrap();
+    tx0.send(phase).expect("Channel closed unexpectedly sending phase information");
+    tx0.send("0".to_string()).expect("Channel closed unexpectedly sending initial input");
+    
+    let mut amps = vec![];
+    for _ in 1..=5 {
+        let (tx1, rx1) = mpsc::channel::<String>();
+        if let Some(phase) = phase_settings.pop() {
+            tx1.send(phase).expect("Channel closed unexpectedly sending phase information");
+        }
+        let input_f = move || {
+            rx0.recv().expect("Channel closed unexpectedly receiving input")
+        };
+        rx0 = rx1;
+
+        amps.push(IntComp::from_string(data.to_owned(), tx1, Box::new(input_f)));
+    }
+
+    let mut last = amps.pop().unwrap();
+    last.output_store = tx0;
+    amps.push(last);
+
+    let mut handles = vec![];
+    for i in 1..=5 {
+        let mut amp = amps.pop().unwrap();  
+        let handle = thread::spawn(move || {
+            amp.run_program();
+            if i == 5 {
+                Some((amp.input)())
+            } else {
+                None
+            }
+        });
+        handles.push(handle);
+    }
+
+    let last = handles.pop().unwrap();
+    last.join().expect("Thread panicked").unwrap()
+    // "0".to_string()
+    
 }
 
 #[cfg(test)]

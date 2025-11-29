@@ -26,7 +26,8 @@ pub struct IntComp  {
     memory: Vec<String>,
     instr_pntr: usize,
     pub output_store: mpsc::Sender<String>,
-    input: Box<dyn FnMut() -> String>,
+    pub last_output: Option<String>,
+    pub input: Box<dyn FnMut() -> String + Send>,
 }
 
 impl fmt::Debug for IntComp {
@@ -46,12 +47,13 @@ impl cmp::PartialEq for IntComp {
 }
 
 impl IntComp {
-    pub fn from_string(s: String,output: mpsc::Sender<String>, input: Box<dyn FnMut() -> String>) -> IntComp {
+    pub fn from_string(s: String,output: mpsc::Sender<String>, input: Box<dyn FnMut() -> String + Send>) -> IntComp {
         let memory = s.split(",").map(|s| s.to_string()).collect();
         IntComp {
             memory,
             instr_pntr: 0,
             output_store: output,
+            last_output: None,
             input,
         }
     }
@@ -153,7 +155,9 @@ impl IntComp {
                 self.store_mem(params.store_location, input).expect("Failed to store value");
             },
             Instruction::Load(loc) => {
-                self.output_store.send(self.load_mem(loc).expect("Failed to load value").to_owned()).expect("Failed to send output");
+                let out_val = self.load_mem(loc).expect("Failed to load value").to_owned();
+                self.last_output = Some(out_val.clone());
+                self.output_store.send(out_val).expect("Failed to send output");
             },
             Instruction::Jump(loc) => {self.instr_pntr = loc },
             Instruction::LT(params) => {
@@ -206,7 +210,7 @@ mod test {
     fn new_testcomp() -> (IntComp,mpsc::Receiver<String>) {
         let test_mem = vec!["1002", "4","3","4","33"].iter().map(|s| s.to_string()).collect();
         let (tx,rx) = mpsc::channel();
-        (IntComp { memory: test_mem, instr_pntr: 0, output_store:tx, input: Box::new(|| "".to_string()) },rx)
+        (IntComp { memory: test_mem, instr_pntr: 0, output_store:tx,last_output:None, input: Box::new(|| "".to_string()) },rx)
     }
 
     #[test]
